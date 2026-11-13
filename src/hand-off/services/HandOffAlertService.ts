@@ -6,13 +6,11 @@ import { ActivityAction, ActivityItemType } from "../../generated/prisma/client"
 import { ReviewRepository } from "../../review/repositories/ReviewRepository";
 import type { HandOffSettingsDto } from "../../settings/dto/HandOffSettingsDto";
 import { SettingsService } from "../../settings/services/SettingsService";
-import type { FinishedCallRecording } from "../../vapi/types/FinishedCallRecording";
+import type { FinishedCallRecording } from "../../calls/types/FinishedCallRecording";
 import { HandOffMailer } from "../clients/HandOffMailer";
 import { TeamPhoneRinger } from "../clients/TeamPhoneRinger";
 import type { HandOffEmailInput } from "../types/HandOffEmailInput";
-import type { HandOffOutcome } from "../types/HandOffOutcome";
 import { HandOffEmailBuilder } from "./HandOffEmailBuilder";
-import { HandOffOutcomeResolver } from "./HandOffOutcomeResolver";
 import { TeamAlertSpeechBuilder } from "./TeamAlertSpeechBuilder";
 
 @Injectable()
@@ -25,7 +23,6 @@ export class HandOffAlertService {
     private readonly reviewRepository: ReviewRepository,
     private readonly activityLog: ActivityLog,
     private readonly clock: Clock,
-    private readonly handOffOutcomeResolver: HandOffOutcomeResolver,
     private readonly handOffEmailBuilder: HandOffEmailBuilder,
     private readonly handOffMailer: HandOffMailer,
     private readonly teamPhoneRinger: TeamPhoneRinger,
@@ -39,10 +36,9 @@ export class HandOffAlertService {
     const canRing = this.appConfiguration.isTwilioConfigured && phone.mobilePhone.length > 0;
     if (!canEmail && !canRing) return;
     if (!(await this.reviewRepository.claimHandOffEmail(recording.report.callId, this.clock.now()))) return;
-    const outcome = this.handOffOutcomeResolver.resolve(recording.report.endedReason, handOff, recording.report.endedAt);
     const wasRungDuringCall = recording.report.handOffReason !== null;
-    if (canRing && outcome !== "transferAnswered" && !wasRungDuringCall) await this.ringTeam(recording.report.callId, phone.mobilePhone);
-    if (canEmail) await this.sendEmail(recording, handOff, outcome);
+    if (canRing && !wasRungDuringCall) await this.ringTeam(recording.report.callId, phone.mobilePhone);
+    if (canEmail) await this.sendEmail(recording, handOff);
   }
 
   private async ringTeam(callId: string, teamPhone: string): Promise<void> {
@@ -54,10 +50,10 @@ export class HandOffAlertService {
     }
   }
 
-  private async sendEmail(recording: FinishedCallRecording, handOff: HandOffSettingsDto, outcome: HandOffOutcome): Promise<void> {
+  private async sendEmail(recording: FinishedCallRecording, handOff: HandOffSettingsDto): Promise<void> {
     const callId = recording.report.callId;
     try {
-      await this.handOffMailer.send(this.handOffEmailBuilder.build(this.makeInput(recording, handOff, outcome)));
+      await this.handOffMailer.send(this.handOffEmailBuilder.build(this.makeInput(recording, handOff)));
       await this.activityLog.record({ action: ActivityAction.handOffEmailSent, itemType: ActivityItemType.review, itemId: callId });
     } catch (error) {
       this.logger.error(`Hand-off email for call ${callId} failed: ${this.describe(error)}`);
@@ -66,11 +62,10 @@ export class HandOffAlertService {
     }
   }
 
-  private makeInput(recording: FinishedCallRecording, handOff: HandOffSettingsDto, outcome: HandOffOutcome): HandOffEmailInput {
+  private makeInput(recording: FinishedCallRecording, handOff: HandOffSettingsDto): HandOffEmailInput {
     const { report, analysis, completion } = recording;
     return {
       to: handOff.teamEmail,
-      outcome,
       callId: report.callId,
       startedAt: report.startedAt,
       endedAt: report.endedAt,
@@ -78,7 +73,6 @@ export class HandOffAlertService {
       topic: analysis.topic,
       summary: analysis.summary,
       lines: analysis.lines,
-      transferNumber: handOff.transferNumber,
       handOffReason: report.handOffReason,
       callUrl: `${this.appConfiguration.frontendOrigin}/review?call=${report.callId}`,
     };
