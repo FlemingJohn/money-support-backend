@@ -7,9 +7,9 @@ import { Clock } from "../../common/services/Clock";
 import { FaqRepository } from "../../faqs/repositories/FaqRepository";
 import { ActivityAction, ActivityItemType } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/services/PrismaService";
-import { FieldLocator } from "../../vapi/services/FieldLocator";
-import { ReportAnalyser } from "../../vapi/services/ReportAnalyser";
-import type { FinishedCallReport } from "../../vapi/types/FinishedCallReport";
+import { FieldLocator } from "../../call-analysis/services/FieldLocator";
+import { ReportAnalyser } from "../../call-analysis/services/ReportAnalyser";
+import type { FinishedCallReport } from "../../calls/types/FinishedCallReport";
 
 @Injectable()
 export class CallReanalysisService {
