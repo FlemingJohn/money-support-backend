@@ -22,14 +22,6 @@ export class AppConfiguration {
     return this.configService.get("DATABASE_CA_CERTIFICATE", { infer: true }).replaceAll("\\n", "\n");
   }
 
-  get vapiWebhookSecret(): string {
-    return this.configService.get("VAPI_WEBHOOK_SECRET", { infer: true });
-  }
-
-  get vapiApiKey(): string {
-    return this.configService.get("VAPI_API_KEY", { infer: true });
-  }
-
   get serviceSecret(): string {
     return this.configService.get("SERVICE_SECRET", { infer: true });
   }
@@ -40,6 +32,22 @@ export class AppConfiguration {
 
   get aiServiceUrl(): string {
     return this.configService.get("AI_SERVICE_URL", { infer: true });
+  }
+
+  get liveKitUrl(): string {
+    return this.configService.get("LIVEKIT_URL", { infer: true });
+  }
+
+  get liveKitApiKey(): string {
+    return this.configService.get("LIVEKIT_API_KEY", { infer: true });
+  }
+
+  get liveKitApiSecret(): string {
+    return this.configService.get("LIVEKIT_API_SECRET", { infer: true });
+  }
+
+  get liveKitAgentName(): string {
+    return this.configService.get("LIVEKIT_AGENT_NAME", { infer: true });
   }
 
   get twilioAccountSid(): string {
@@ -78,7 +86,7 @@ export class AppConfiguration {
     return this.mailUser.length > 0 && this.mailAppPassword.length > 0;
   }
 
-  get isVapiApiConfigured(): boolean {
-    return this.vapiApiKey.length > 0;
+  get isLiveKitConfigured(): boolean {
+    return [this.liveKitUrl, this.liveKitApiKey, this.liveKitApiSecret].every((value) => value.length > 0);
   }
 }
