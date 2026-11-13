@@ -1,6 +1,6 @@
-# backend
+# money-support-backend
 
-NestJS API that owns the database. It receives Vapi call events, stores redacted calls, runs the review queue and call backs, and serves the dashboard. Nothing here runs during a live call: if this service is down, callers still get answers and Vapi retries the webhooks.
+NestJS API that owns the database. It gives the LiveKit voice worker the published agent, receives its call reports, stores redacted calls, runs the review queue and call backs, issues test-call tokens, and serves the dashboard. The voice worker reads the agent once when a call starts and reports once when it ends, so a slow backend never stalls a caller mid-call.
 
 ## How it is built
 
@@ -13,13 +13,12 @@ NestJS API that owns the database. It receives Vapi call events, stores redacted
 | `CallAnalysisClient` | `AiCallAnalysisClient` (ai/ analysis graph; saves lines as waiting if ai/ fails) | `PendingCallAnalysisClient` |
 | `AssistantSyncClient` | `AiAssistantSyncClient` | `SkippedAssistantSyncClient` |
 | `OutboundCallClient` | `TwilioBridgeClient` | `SimulatedBridgeClient` |
-| `VapiEventHandler` | `StatusUpdateHandler`, `EndOfCallReportHandler`, chosen by event type | |
 
 ## Endpoints
 
 | Method | Path | Used by |
 |---|---|---|
-| POST | `/vapi/webhook` | Vapi, with the `x-vapi-secret` header |
+| POST | `/test-calls` | Test call page: a LiveKit token for a new web room with the agent in it |
 | GET | `/overview` | Overview |
 | GET | `/calls?outcome=&search=&page=&pageSize=` | Calls |
 | GET | `/calls/:callId` | Call detail |
@@ -40,31 +39,25 @@ NestJS API that owns the database. It receives Vapi call events, stores redacted
 | GET | `/health` | Connections tab |
 | GET | `/internal/faqs` | ai/, with the `x-service-secret` header |
 | GET | `/internal/settings` | ai/, with the `x-service-secret` header |
+| GET | `/internal/agent/published` | Voice worker, when a call starts |
+| POST | `/internal/calls/started` · `/internal/calls/finished` | Voice worker, when a call starts and ends |
+| POST | `/internal/hand-offs/ring` | Voice worker, during a hand-off |
 | POST | `/internal/retention/run` | Supabase Cron, with the `x-cron-secret` header |
 | POST | `/masking/line` | Test call page, limited to 180 checks a minute per address |
 
 ## What happens when a call ends
 
-1. `VapiSecretGuard` checks the secret and the Zod DTO checks the payload.
-2. `VapiReportReader` turns the payload into a `FinishedCallReport`.
-3. `ReportAnalyser` sends the transcript, the privacy toggles and the FAQs to ai/ `/analysis`, which returns masked lines, summary, topic, matched FAQ and fields. If ai/ is down, every line is saved as "[waiting for privacy check]" and Vapi's copy is kept.
+1. `ServiceSecretGuard` checks the secret and `CallFinishedDto` checks the report the voice worker sent.
+2. `CallReportReader` turns it into a `FinishedCallReport`. The end reason is one of `callerHungUp`, `agentEndedCall`, `handedOff`, `silenceTimeout`, `timeLimit` or `error`.
+3. `ReportAnalyser` sends the transcript, the privacy toggles and the FAQs to ai/ `/analysis`, which returns masked lines, summary, topic, matched FAQ and fields. If ai/ is down, every line is saved as "[waiting for privacy check]".
 4. `ReviewTriage` decides whether a person needs to look at it: hand-off, removed or unchecked data, a field under 75% confidence, or a possible mistake suggested by ai/.
 5. `CallCompletionBuilder` masks the caller's number for display, and keeps the full number for call backs when that privacy setting is on. The caller's number is also sent to ai, so it stays in the transcript while any other phone number is masked.
 6. `FinishedCallWriter` saves the call, messages, fields, guardrail events, review and activity in one transaction.
-7. `HandOffAlertService` rings the team phone in Settings → Phone, then emails the team, when the call was handed off, a transfer was not answered, the caller hung up during a transfer, or the caller rang out of hours. It sends once per call, using only masked details, and never stops the call being saved if Gmail fails.
-8. `VapiCallArchive` deletes Vapi's own copy when that privacy setting is on and the analysis is complete.
+7. `HandOffAlertService` emails the team when the call was handed off, and rings the team phone in Settings → Phone if the agent did not already ring it during the call. It sends once per call, using only masked details, and never stops the call being saved if Gmail fails.
 
 ## Hand-off emails
 
-| Case | Vapi `endedReason` | Subject starts with |
-|---|---|---|
-| Handed off | the hand-off sentence was said | Follow up a handed-off call |
-| Transfer not answered | `call.forwarding.no-answer`, `call.forwarding.operator-busy`, `call.in-progress.error-transfer-failed` | ⚠ Missed transfer, please call back |
-| Caller left during transfer | `customer-ended-call-during-transfer` | ⚠ Caller hung up during transfer, please call back |
-| Out of hours | transfer mode, weekday hours, outside Mon–Fri 9am–5pm UK | Out-of-hours caller, follow up next working day |
-| Transfer answered | `assistant-forwarded-call` | Transferred to you |
-
-Emails go through Gmail SMTP with an app password (`MAIL_USER`, `MAIL_APP_PASSWORD`) to the address in Settings → Hand-off. `reviews.hand_off_emailed_at` is claimed in one update before sending, so a repeated report never sends twice; a failed send clears it and logs `handOffEmailFailed`.
+A handed-off call (end reason `handedOff`, or the hand-off sentence in the transcript) gets one email whose subject starts with "Follow up a handed-off call". Emails go through Gmail SMTP with an app password (`MAIL_USER`, `MAIL_APP_PASSWORD`) to the address in Settings → Hand-off. `reviews.hand_off_emailed_at` is claimed in one update before sending, so a repeated report never sends twice; a failed send clears it and logs `handOffEmailFailed`.
 
 ## Structure
 
@@ -76,7 +69,10 @@ src/
 ├── configuration/   environment schema and typed AppConfiguration
 ├── prisma/          PrismaService and the transaction type
 ├── common/          guards, SecretMatcher, EncryptionService, Clock
-├── vapi/            webhook, report reading, call analysis, recording
+├── call-intake/     the voice worker's call reports, saved as calls
+├── call-analysis/   asks ai/ to analyse a call; shared with reports/
+├── published-agent/ the current prompt and settings for the voice worker
+├── test-calls/      LiveKit tokens for test calls
 ├── calls/           calls, messages, extracted fields, number protection
 ├── review/          review queue, triage, verdicts, unmasked reports
 ├── callbacks/       call backs through Twilio or the simulator
@@ -84,7 +80,7 @@ src/
 ├── assistant/       agent sync with ai/ and prompt versions
 ├── guardrails/      guardrail events and the kinds of data to mask
 ├── masking/         live masking of test call lines
-├── hand-off-email/  emails the team after hand-offs and missed transfers
+├── hand-off/        rings and emails the team after a hand-off
 ├── overview/        statistics for the overview page
 ├── settings/        settings sections with defaults
 ├── activity/        activity log
@@ -116,7 +112,7 @@ calls/
 | `queries/` | Prisma include shapes used by repositories |
 | `presenters/` | Turn database rows into API responses |
 | `clients/` | Outside services: an abstract class and its implementations |
-| `handlers/` | One class per Vapi event type |
+| `catalogs/` | Fixed lists and wordings |
 | `jobs/` | Scheduled tasks |
 | `guards/` | Request checks |
 | `dto/` | Request validation with Zod |
@@ -129,7 +125,6 @@ Tests mirror the source layout: `test/review/services/ReviewTriage.test.ts` test
 ## Local setup
 
 ```bash
-cd backend
 npm install
 cp .env.example .env
 ```
@@ -141,8 +136,10 @@ Fill in `.env`:
 | `DATABASE_URL` | Supabase pooler in transaction mode (port 6543), with no `sslmode` in the URL, or a local database |
 | `DATABASE_CA_CERTIFICATE` | Text of `certs/supabase-ca.crt`, so the connection to Supabase is verified. Leave empty for a local database. |
 | `DIRECT_URL` | Supabase pooler in session mode (port 5432) with `?sslmode=verify-full&sslrootcert=certs/supabase-ca.crt`, used for migrations |
-| `VAPI_WEBHOOK_SECRET`, `SERVICE_SECRET`, `CRON_SECRET` | Long random strings |
+| `SERVICE_SECRET`, `CRON_SECRET` | Long random strings. The voice worker and ai/ use the same `SERVICE_SECRET`. |
 | `AI_SERVICE_URL` | Leave empty until ai/ runs |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | The LiveKit project, for test-call tokens |
+| `LIVEKIT_AGENT_NAME` | The voice worker's name, `money-support` by default |
 | `TWILIO_*` | Needed for real call backs and for ringing the team phone after a hand-off. Leave empty to use the call back simulator and skip the ring. |
 
 Without Supabase, `npx prisma dev` runs a local Postgres and prints a connection string to use for both database variables.
@@ -152,7 +149,7 @@ npx prisma migrate dev
 npm run dev
 ```
 
-The API listens on http://localhost:4000. Vapi needs a public URL for the webhook, so expose the port with a tunnel such as ngrok or cloudflared when testing real calls.
+The API listens on http://localhost:4000. A voice worker running on LiveKit Cloud needs a public URL for it, so expose the port with a tunnel such as ngrok or cloudflared when testing real calls against a local backend.
 
 | Command | What it does |
 |---|---|
