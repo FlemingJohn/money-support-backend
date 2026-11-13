@@ -5,8 +5,8 @@ import { CustomerNumberMasker } from "../../calls/services/CustomerNumberMasker"
 import { FaqRepository } from "../../faqs/repositories/FaqRepository";
 import { CallChannel, CallOutcome, type Faq } from "../../generated/prisma/client";
 import { SettingsService } from "../../settings/services/SettingsService";
-import type { FinishedCallReport } from "../types/FinishedCallReport";
-import type { CallAnalysis } from "../types/CallAnalysis";
+import type { FinishedCallReport } from "../../calls/types/FinishedCallReport";
+import type { CallAnalysis } from "../../call-analysis/types/CallAnalysis";
 
 @Injectable()
 export class CallCompletionBuilder {
