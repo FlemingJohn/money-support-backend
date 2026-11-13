@@ -1,8 +1,8 @@
 import type { AppConfiguration } from "../../../src/configuration/services/AppConfiguration";
 import { ReviewReason, Speaker } from "../../../src/generated/prisma/client";
-import { AiCallAnalysisClient } from "../../../src/vapi/clients/AiCallAnalysisClient";
-import { PendingAnalysisBuilder } from "../../../src/vapi/services/PendingAnalysisBuilder";
-import type { CallAnalysisInput } from "../../../src/vapi/types/CallAnalysisInput";
+import { AiCallAnalysisClient } from "../../../src/call-analysis/clients/AiCallAnalysisClient";
+import { PendingAnalysisBuilder } from "../../../src/call-analysis/services/PendingAnalysisBuilder";
+import type { CallAnalysisInput } from "../../../src/call-analysis/types/CallAnalysisInput";
 
 describe("AiCallAnalysisClient", () => {
   const appConfiguration = { aiServiceUrl: "http://ai.test", serviceSecret: "secret" } as AppConfiguration;
@@ -13,7 +13,7 @@ describe("AiCallAnalysisClient", () => {
       { position: 0, speaker: Speaker.agent, text: "Hi", secondsFromStart: 1 },
       { position: 1, speaker: Speaker.caller, text: "I am Ananya", secondsFromStart: 3 },
     ],
-    endedReason: "assistant-ended-call",
+    endedReason: "agentEndedCall",
     maskKinds: ["name"],
     faqs: [{ number: 2, question: "When will my money arrive?" }],
     callerNumber: "+447700900123",
