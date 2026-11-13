@@ -1,9 +1,7 @@
 import type { RedactedLine } from "../../guardrails/types/RedactedLine";
-import type { HandOffOutcome } from "./HandOffOutcome";
 
 export interface HandOffEmailInput {
   to: string;
-  outcome: HandOffOutcome;
   callId: string;
   startedAt: Date | null;
   endedAt: Date;
@@ -11,7 +9,6 @@ export interface HandOffEmailInput {
   topic: string | null;
   summary: string | null;
   lines: RedactedLine[];
-  transferNumber: string;
   handOffReason: string | null;
   callUrl: string;
 }
