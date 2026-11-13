@@ -12,10 +12,8 @@ import { TwilioTeamPhoneRinger } from "./clients/TwilioTeamPhoneRinger";
 import { HandOffRingController } from "./controllers/HandOffRingController";
 import { HandOffAlertService } from "./services/HandOffAlertService";
 import { HandOffEmailBuilder } from "./services/HandOffEmailBuilder";
-import { HandOffOutcomeResolver } from "./services/HandOffOutcomeResolver";
 import { HandOffRingService } from "./services/HandOffRingService";
 import { TeamAlertSpeechBuilder } from "./services/TeamAlertSpeechBuilder";
-import { TeamHoursChecker } from "./services/TeamHoursChecker";
 
 @Module({
   imports: [
@@ -42,8 +40,6 @@ import { TeamHoursChecker } from "./services/TeamHoursChecker";
     HandOffRingService,
     TeamAlertSpeechBuilder,
     HandOffEmailBuilder,
-    HandOffOutcomeResolver,
-    TeamHoursChecker,
     { provide: HandOffMailer, useClass: GmailHandOffMailer },
     {
       provide: TeamPhoneRinger,
@@ -54,4 +50,4 @@ import { TeamHoursChecker } from "./services/TeamHoursChecker";
   ],
   exports: [HandOffAlertService],
 })
-export class HandOffEmailModule {}
+export class HandOffModule {}
