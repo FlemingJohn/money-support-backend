@@ -10,9 +10,9 @@ import { GuardrailEventRepository } from "../../guardrails/repositories/Guardrai
 import type { DatabaseTransaction } from "../../prisma/types/DatabaseTransaction";
 import { PrismaService } from "../../prisma/services/PrismaService";
 import { ReviewRepository } from "../../review/repositories/ReviewRepository";
-import { FieldLocator } from "./FieldLocator";
-import type { FinishedCallRecording } from "../types/FinishedCallRecording";
-import type { CallAnalysis } from "../types/CallAnalysis";
+import { FieldLocator } from "../../call-analysis/services/FieldLocator";
+import type { FinishedCallRecording } from "../../calls/types/FinishedCallRecording";
+import type { CallAnalysis } from "../../call-analysis/types/CallAnalysis";
 
 @Injectable()
 export class FinishedCallWriter {
