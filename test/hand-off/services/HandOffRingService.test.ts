@@ -1,7 +1,7 @@
 import type { AppConfiguration } from "../../../src/configuration/services/AppConfiguration";
-import type { TeamPhoneRinger } from "../../../src/hand-off-email/clients/TeamPhoneRinger";
-import { HandOffRingService } from "../../../src/hand-off-email/services/HandOffRingService";
-import { TeamAlertSpeechBuilder } from "../../../src/hand-off-email/services/TeamAlertSpeechBuilder";
+import type { TeamPhoneRinger } from "../../../src/hand-off/clients/TeamPhoneRinger";
+import { HandOffRingService } from "../../../src/hand-off/services/HandOffRingService";
+import { TeamAlertSpeechBuilder } from "../../../src/hand-off/services/TeamAlertSpeechBuilder";
 import type { SettingsService } from "../../../src/settings/services/SettingsService";
 
 describe("HandOffRingService", () => {
