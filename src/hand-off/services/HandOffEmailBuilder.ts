@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Speaker } from "../../generated/prisma/client";
-import { handOffEmailWordings } from "../catalogs/handOffEmailWordings";
+import { handOffEmailWording } from "../catalogs/handOffEmailWording";
 import { handOffReasonLabels } from "../catalogs/handOffReasonLabels";
 import type { HandOffEmail } from "../types/HandOffEmail";
 import type { HandOffEmailInput } from "../types/HandOffEmailInput";
@@ -12,7 +12,7 @@ export class HandOffEmailBuilder {
   private readonly ukTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
   build(input: HandOffEmailInput): HandOffEmail {
-    const wording = this.findWording(input);
+    const wording = handOffEmailWording;
     const details = this.makeDetails(input);
     const lines = this.makeLastLines(input);
     return {
@@ -21,11 +21,6 @@ export class HandOffEmailBuilder {
       text: this.makeText(wording, input, details, lines),
       html: this.makeHtml(wording, input, details, lines),
     };
-  }
-
-  private findWording(input: HandOffEmailInput): HandOffEmailWording {
-    const wording = handOffEmailWordings[input.outcome];
-    return { ...wording, explanation: wording.explanation.replace("{transferNumber}", input.transferNumber || "the team") };
   }
 
   private makeDetails(input: HandOffEmailInput): [string, string][] {
