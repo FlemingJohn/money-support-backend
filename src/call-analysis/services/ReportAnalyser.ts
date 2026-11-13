@@ -4,7 +4,7 @@ import { MaskedEntityTypeResolver } from "../../guardrails/services/MaskedEntity
 import { SettingsService } from "../../settings/services/SettingsService";
 import { CallAnalysisClient } from "../clients/CallAnalysisClient";
 import type { CallAnalysis } from "../types/CallAnalysis";
-import type { FinishedCallReport } from "../types/FinishedCallReport";
+import type { FinishedCallReport } from "../../calls/types/FinishedCallReport";
 
 @Injectable()
 export class ReportAnalyser {
