@@ -1,6 +1,6 @@
-import type { CallCompletion } from "../../calls/types/CallCompletion";
+import type { CallCompletion } from "./CallCompletion";
 import type { ReviewReason } from "../../generated/prisma/client";
-import type { CallAnalysis } from "./CallAnalysis";
+import type { CallAnalysis } from "../../call-analysis/types/CallAnalysis";
 import type { FinishedCallReport } from "./FinishedCallReport";
 
 export interface FinishedCallRecording {
