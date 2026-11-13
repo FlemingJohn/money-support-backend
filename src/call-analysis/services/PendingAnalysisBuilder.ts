@@ -6,7 +6,7 @@ import type { CallAnalysisInput } from "../types/CallAnalysisInput";
 @Injectable()
 export class PendingAnalysisBuilder {
   private readonly waitingText = "[waiting for privacy check]";
-  private readonly handOffEndedReason = "assistant-said-end-call-phrase";
+  private readonly handOffEndedReason = "handedOff";
 
   build(input: CallAnalysisInput): CallAnalysis {
     return {
