@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { ZodValidationPipe } from "nestjs-zod";
 import { ActivityModule } from "./activity/ActivityModule";
 import { AssistantModule } from "./assistant/AssistantModule";
+import { CallIntakeModule } from "./call-intake/CallIntakeModule";
 import { CallbacksModule } from "./callbacks/CallbacksModule";
 import { CallsModule } from "./calls/CallsModule";
 import { CommonModule } from "./common/CommonModule";
@@ -16,10 +17,11 @@ import { OverviewModule } from "./overview/OverviewModule";
 import { PrismaModule } from "./prisma/PrismaModule";
 import { RetentionModule } from "./retention/RetentionModule";
 import { ImprovementModule } from "./improvement/ImprovementModule";
+import { PublishedAgentModule } from "./published-agent/PublishedAgentModule";
 import { ReportsModule } from "./reports/ReportsModule";
 import { ReviewModule } from "./review/ReviewModule";
 import { SettingsModule } from "./settings/SettingsModule";
-import { VapiModule } from "./vapi/VapiModule";
+import { TestCallsModule } from "./test-calls/TestCallsModule";
 
 @Module({
   imports: [
@@ -34,7 +36,9 @@ import { VapiModule } from "./vapi/VapiModule";
     FaqsModule,
     CallsModule,
     ReviewModule,
-    VapiModule,
+    CallIntakeModule,
+    PublishedAgentModule,
+    TestCallsModule,
     CallbacksModule,
     OverviewModule,
     RetentionModule,
