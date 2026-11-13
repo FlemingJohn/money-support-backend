@@ -14,7 +14,7 @@ export class HealthService {
   ) {}
 
   async check(): Promise<HealthResponse> {
-    const services = await Promise.all([this.checkDatabase(), this.checkAiService(), this.checkCallbacks()]);
+    const services = await Promise.all([this.checkDatabase(), this.checkAiService(), this.checkVoice(), this.checkCallbacks()]);
     return { isHealthy: services.every((service) => service.state !== "down"), services };
   }
 
@@ -30,6 +30,11 @@ export class HealthService {
       const response = await fetch(`${this.appConfiguration.aiServiceUrl}/health`, { signal: AbortSignal.timeout(this.aiServiceTimeoutMilliseconds) });
       if (!response.ok) throw new Error(`ai/ answered ${response.status}`);
     });
+  }
+
+  private async checkVoice(): Promise<ServiceHealth> {
+    if (!this.appConfiguration.isLiveKitConfigured) return this.notConfigured("voice");
+    return { name: "voice", state: "up", latencyMilliseconds: null };
   }
 
   private async checkCallbacks(): Promise<ServiceHealth> {
