@@ -2,19 +2,17 @@ import type { ActivityLog } from "../../../src/activity/services/ActivityLog";
 import type { Clock } from "../../../src/common/services/Clock";
 import type { AppConfiguration } from "../../../src/configuration/services/AppConfiguration";
 import { ActivityAction } from "../../../src/generated/prisma/client";
-import type { HandOffMailer } from "../../../src/hand-off-email/clients/HandOffMailer";
-import type { TeamPhoneRinger } from "../../../src/hand-off-email/clients/TeamPhoneRinger";
-import { HandOffAlertService } from "../../../src/hand-off-email/services/HandOffAlertService";
-import { HandOffEmailBuilder } from "../../../src/hand-off-email/services/HandOffEmailBuilder";
-import { HandOffOutcomeResolver } from "../../../src/hand-off-email/services/HandOffOutcomeResolver";
-import { TeamAlertSpeechBuilder } from "../../../src/hand-off-email/services/TeamAlertSpeechBuilder";
-import { TeamHoursChecker } from "../../../src/hand-off-email/services/TeamHoursChecker";
+import type { HandOffMailer } from "../../../src/hand-off/clients/HandOffMailer";
+import type { TeamPhoneRinger } from "../../../src/hand-off/clients/TeamPhoneRinger";
+import { HandOffAlertService } from "../../../src/hand-off/services/HandOffAlertService";
+import { HandOffEmailBuilder } from "../../../src/hand-off/services/HandOffEmailBuilder";
+import { TeamAlertSpeechBuilder } from "../../../src/hand-off/services/TeamAlertSpeechBuilder";
 import type { ReviewRepository } from "../../../src/review/repositories/ReviewRepository";
 import type { SettingsService } from "../../../src/settings/services/SettingsService";
-import type { FinishedCallRecording } from "../../../src/vapi/types/FinishedCallRecording";
+import type { FinishedCallRecording } from "../../../src/calls/types/FinishedCallRecording";
 
 describe("HandOffAlertService", () => {
-  const handOff = { mode: "endCall", handOffSentence: "Please contact the team.", transferNumber: "", teamHours: "weekdays", emailTeam: true, teamEmail: "team@example.com" };
+  const handOff = { handOffSentence: "Please contact the team.", emailTeam: true, teamEmail: "team@example.com" };
   const settingsService = { getHandOff: jest.fn(), getPhone: jest.fn() };
   const reviewRepository = { claimHandOffEmail: jest.fn(), releaseHandOffEmail: jest.fn() };
   const activityLog = { record: jest.fn() };
@@ -27,7 +25,6 @@ describe("HandOffAlertService", () => {
     reviewRepository as unknown as ReviewRepository,
     activityLog as unknown as ActivityLog,
     { now: () => new Date("2026-11-04T15:30:00Z") } as Clock,
-    new HandOffOutcomeResolver(new TeamHoursChecker()),
     new HandOffEmailBuilder(),
     mailer as unknown as HandOffMailer,
     ringer as unknown as TeamPhoneRinger,
@@ -44,49 +41,39 @@ describe("HandOffAlertService", () => {
   });
 
   it("emails the team once for a handed-off call", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(mailer.send).toHaveBeenCalledTimes(1);
     expect(mailer.send.mock.calls[0][0].to).toBe("team@example.com");
     expect(activityLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: ActivityAction.handOffEmailSent }));
   });
 
   it("does not email a call the agent answered itself", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(false, "customer-ended-call"));
+    await service.alertTeamIfHandedOff(makeRecording(false, "callerHungUp"));
     expect(mailer.send).not.toHaveBeenCalled();
     expect(ringer.ring).not.toHaveBeenCalled();
-  });
-
-  it("emails a record of an answered transfer", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-forwarded-call"));
-    expect(mailer.send.mock.calls[0][0].subject).toMatch(/^Transferred to you: /);
   });
 
   it("does not email again when the same report arrives twice", async () => {
     reviewRepository.claimHandOffEmail.mockResolvedValue(false);
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(mailer.send).not.toHaveBeenCalled();
   });
 
   it("rings the team phone and emails for a handed-off call", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(ringer.ring).toHaveBeenCalledWith("+447700900123", expect.stringContaining("A customer needs help"));
     expect(mailer.send).toHaveBeenCalledTimes(1);
   });
 
-  it("does not ring for a transfer someone already answered", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-forwarded-call"));
-    expect(ringer.ring).not.toHaveBeenCalled();
-  });
-
   it("does not ring again after the call when the tool already rang during it", async () => {
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-ended-call-after-message-spoken", "askedForPerson"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff", "askedForPerson"));
     expect(ringer.ring).not.toHaveBeenCalled();
     expect(mailer.send.mock.calls[0][0].text).toContain("Why: Asked to speak to a person");
   });
 
   it("still rings when emails are off", async () => {
     settingsService.getHandOff.mockResolvedValue({ ...handOff, emailTeam: false });
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(ringer.ring).toHaveBeenCalledTimes(1);
     expect(mailer.send).not.toHaveBeenCalled();
   });
@@ -94,19 +81,19 @@ describe("HandOffAlertService", () => {
   it("does nothing when there is no team phone and emails are off", async () => {
     settingsService.getHandOff.mockResolvedValue({ ...handOff, emailTeam: false });
     settingsService.getPhone.mockResolvedValue({ deskPhone: "", mobilePhone: "", storedNumberRetention: "whenResolved" });
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(reviewRepository.claimHandOffEmail).not.toHaveBeenCalled();
   });
 
   it("still emails when ringing fails", async () => {
     ringer.ring.mockRejectedValue(new Error("twilio down"));
-    await service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"));
+    await service.alertTeamIfHandedOff(makeRecording(true, "handedOff"));
     expect(mailer.send).toHaveBeenCalledTimes(1);
   });
 
   it("releases the claim and logs a failure without throwing when sending fails", async () => {
     mailer.send.mockRejectedValue(new Error("smtp down"));
-    await expect(service.alertTeamIfHandedOff(makeRecording(true, "assistant-said-end-call-phrase"))).resolves.toBeUndefined();
+    await expect(service.alertTeamIfHandedOff(makeRecording(true, "handedOff"))).resolves.toBeUndefined();
     expect(reviewRepository.releaseHandOffEmail).toHaveBeenCalledWith("call-1");
     expect(activityLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: ActivityAction.handOffEmailFailed }));
   });
